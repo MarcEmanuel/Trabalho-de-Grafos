@@ -3,7 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define INF 999999999
+#define INF 99999999
 #define NULO -1
 #define TRUE 1
 #define FALSE 0
