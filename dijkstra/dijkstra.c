@@ -3,173 +3,129 @@
 #include <stdbool.h>
 #include <string.h>
 
-struct No {
-    int vertice;
-    int distancia;
-    struct No* prox;
-} typedef No;
+struct AdjListNode {
+    int dest;
+    int weight;
+    struct AdjListNode* next;
+};
+
+struct AdjList {
+    struct AdjListNode* head;
+};
+
+struct Graph {
+    int V;
+    struct AdjList* array;
+};
 
 struct HeapNode {
     int vertice;
     int distancia;
 };
 
-No* searchMinDistance(No* distancias[], bool visitados[], int numVertices) {
-    int i;
-    No* agora = NULL;
+typedef struct Graph Graph;
+typedef struct HeapNode HeapNode;
+typedef struct AdjListNode AdjListNode;
+typedef struct AdjList AdjList;
 
-    for (i = 0; i < numVertices; i++) {
-        if (distancias[i] != NULL && distancias[i]->distancia < agora->distancia && visitados[i] == false) {
-            agora = distancias[i];
+Graph* createGraph(int V) {
+    Graph* graph = (Graph*)malloc(sizeof(Graph));
+    graph->V = V;
+    graph->array = (AdjList*)malloc(V * sizeof(AdjList));
+
+    for (int i = 0; i < V; i++) {
+        graph->array[i].head = NULL;
+    }
+
+    return graph;
+}
+
+void addEdge(Graph* graph, int src, int dest, int weight) {
+    AdjListNode* newNode = (AdjListNode*)malloc(sizeof(AdjListNode));
+    newNode->dest = dest;
+    newNode->weight = weight;
+    newNode->next = graph->array[src].head;
+    graph->array[src].head = newNode;
+}
+
+HeapNode* searchMinDistance(HeapNode* distancias, bool visitados[], int numVertices) {
+    int minDist = -1;
+    HeapNode* minNode = NULL;
+
+    for (int v = 0; v < numVertices; v++) {
+        if (!visitados[v] && distancias[v].distancia != -1) {
+            if (minDist == -1 || distancias[v].distancia < minDist) {
+                minDist = distancias[v].distancia;
+                minNode = &distancias[v];
+            }
         }
     }
-    return agora;
+    return minNode;
 }
 
-// Estrutura para representar um heap mínimo (min-heap)
-struct MinHeap {
-    struct HeapNode* array;
-    int tamanho;
-    int capacidade;
-};
+HeapNode* dijkstra(Graph* graph, int inicio) {
+    int numVertices = graph->V;
+    HeapNode* distancias = (HeapNode*)malloc(numVertices * sizeof(HeapNode));
+    bool visitados[numVertices];
 
-struct MinHeap* createMinHeap(int capacidade) {
-    struct MinHeap* minHeap = (struct MinHeap*)malloc(sizeof(struct MinHeap));
-    minHeap->tamanho = 0;
-    minHeap->capacidade = capacidade;
-    minHeap->array = (struct HeapNode*)malloc(capacidade * sizeof(struct HeapNode));
-    return minHeap;
-}
-
-void swap(struct HeapNode* a, struct HeapNode* b) {
-    struct HeapNode temp = *a;
-    *a = *b;
-    *b = temp;
-}
-
-void minHeapify(struct MinHeap* minHeap, int indice) {
-    int menor = indice;
-    int esquerda = 2 * indice + 1;
-    int direita = 2 * indice + 2;
-
-    if (esquerda < minHeap->tamanho && minHeap->array[esquerda].distancia < minHeap->array[menor].distancia) {
-        menor = esquerda;
+    for (int i = 0; i < numVertices; i++) {
+        distancias[i].vertice = i;
+        distancias[i].distancia = -1;
+        visitados[i] = false;
     }
 
-    if (direita < minHeap->tamanho && minHeap->array[direita].distancia < minHeap->array[menor].distancia) {
-        menor = direita;
-    }
+    distancias[inicio].distancia = 0;
 
-    if (menor != indice) {
-        swap(&minHeap->array[indice], &minHeap->array[menor]);
-        minHeapify(minHeap, menor);
-    }
-}
-
-struct HeapNode extractMin(struct MinHeap* minHeap) {
-    struct HeapNode min = minHeap->array[0];
-    minHeap->array[0] = minHeap->array[minHeap->tamanho - 1];
-    minHeap->tamanho--;
-    minHeapify(minHeap, 0);
-    return min;
-}
-
-void decreaseKey(struct MinHeap* minHeap, int vertice, int novaDistancia) {
-    int i;
-    for (i = 0; i < minHeap->tamanho; i++) {
-        if (minHeap->array[i].vertice == vertice) {
-            minHeap->array[i].distancia = novaDistancia;
+    for (int count = 0; count < numVertices - 1; count++) {
+        HeapNode* minNode = searchMinDistance(distancias, visitados, numVertices);
+        if (minNode == NULL) {
             break;
         }
-    }
+        int u = minNode->vertice;
+        visitados[u] = true;
 
-    i = (i - 1) / 2;
-    while (i >= 0 && minHeap->array[i].distancia > minHeap->array[(i - 1) / 2].distancia) {
-        swap(&minHeap->array[i], &minHeap->array[(i - 1) / 2]);
-        i = (i - 1) / 2;
-    }
-}
-
-bool isInMinHeap(struct MinHeap* minHeap, int vertice) {
-    int i;
-    for (i = 0; i < minHeap->tamanho; i++) {
-        if (minHeap->array[i].vertice == vertice) {
-            return true;
+        AdjListNode* node = graph->array[u].head;
+        while (node != NULL) {
+            int v = node->dest;
+            if (!visitados[v] && (distancias[u].distancia != -1) && (distancias[v].distancia == -1 || distancias[u].distancia + node->weight < distancias[v].distancia)) {
+                distancias[v].distancia = distancias[u].distancia + node->weight;
+            }
+            node = node->next;
         }
     }
-    return false;
+
+    return distancias;
 }
 
-void MostrarCaminho(No* distancia[], int numVertice, bool mostrarCmd, FILE* out) {
-    int i;
-    if (mostrarCmd == true) {
-        for (i = 1; i < numVertice; i++) {
-            if (distancia[i] == NULL || distancia[i]->distancia == 99999) {
-                printf("%d:-1 ", i);
-            } else {
-                printf("%d:%d ", i, distancia[i]->distancia);
+void MostrarCaminho(HeapNode* distancias, int numVertice, bool mostrarCmd, FILE* out) {
+    if (mostrarCmd) {
+        for (int i = 0; i < numVertice; i++) {
+            if (i != 0) {
+                printf(" ");
             }
+            printf("%d:%d", i, distancias[i].distancia);
         }
         printf("\n");
     } else {
-        for (i = 1; i < numVertice; i++) {
-            if (distancia[i] == NULL) {
-                fprintf(out, "(%d:-1) ", i);
-            } else {
-                fprintf(out, "(%d:%d) ", i, distancia[i]->distancia);
-            }
+        for (int i = 0; i < numVertice; i++) {
+            fprintf(out, "(%d:%d) ", i, distancias[i].distancia);
         }
         fprintf(out, "\n");
         fclose(out);
     }
 }
 
-void Dijkstra(int numVertex, int grafo[][numVertex], int inicio, bool mostrarCmd, FILE* out) {
-    int i, j;
-    No* distancia[numVertex];
-    bool visited[numVertex];
-    struct MinHeap* minHeap = createMinHeap(numVertex);
-
-    for (i = 0; i < numVertex; i++) {
-        distancia[i] = NULL;
-        visited[i] = false;
-    }
-
-    distancia[inicio] = (No*)malloc(sizeof(No));
-    distancia[inicio]->vertice = inicio;
-    distancia[inicio]->distancia = 0;
-    distancia[inicio]->prox = NULL;
-    minHeap->array[0].vertice = inicio;
-    minHeap->array[0].distancia = 0;
-    minHeap->tamanho = 1;
-
-    for (i = 0; i < numVertex - 1; i++) {
-        struct HeapNode minNode = extractMin(minHeap);
-        int u = minNode.vertice;
-        visited[u] = true;
-
-        for (j = 0; j < numVertex; j++) {
-            if (!visited[j] && grafo[u][j] && distancia[u]->distancia != 99999 && grafo[u][j] + distancia[u]->distancia < distancia[j]->distancia) {
-                distancia[j]->distancia = grafo[u][j] + distancia[u]->distancia;
-                decreaseKey(minHeap, j, distancia[j]->distancia);
-            }
-        }
-    }
-
-    MostrarCaminho(distancia, numVertex, mostrarCmd, out);
-}
-
 void help() {
-    printf("-o <arquivo> : redireciona a saida para o arquivo\n");
-    printf("-f <arquivo> : indica o arquivo que contem o grafo de entrada\n");
-    printf("-s : mostra a solucao (em ordem crescente)\n");
-    printf("-i : vertice inicial\n");
+    printf("-o <arquivo> : redireciona a saída para o arquivo\n");
+    printf("-f <arquivo> : indica o arquivo que contém o grafo de entrada\n");
+    printf("-s : mostra a solução (em ordem crescente)\n");
+    printf("-i : vértice inicial\n");
 }
 
 int Parametro(int argc, char* argv[], bool* mostrarCmd, int* iniVertice, FILE** input, FILE** output) {
     int i;
     if (argc < 2) {
-        printf("precione -h para saber infromacoes\n");
+        printf("pressione -h para saber informações\n");
         return 0;
     }
 
@@ -230,15 +186,16 @@ int main(int argc, char* argv[]) {
     }
 
     fscanf(inputFile, "%d %d", &numVertex, &numArestas);
-    int grafo[numVertex + 1][numVertex + 1];
-    memset(grafo, 0, sizeof(grafo));
+    Graph* grafo = createGraph(numVertex);
 
     while (fscanf(inputFile, "%d %d %d", &x1, &x2, &peso) != EOF) {
-        grafo[x1][x2] = peso;
-        grafo[x2][x1] = peso;
+        addEdge(grafo, x1, x2, peso);
+        addEdge(grafo, x2, x1, peso);  // Grafo não direcionado, adicionamos ambas as direções
     }
 
-    Dijkstra(numVertex + 1, grafo, iniVertice, mostrarCmd, outputFile);
+    HeapNode* distancias = dijkstra(grafo, iniVertice);
+
+    MostrarCaminho(distancias, numVertex, mostrarCmd, outputFile);
 
     fclose(inputFile);
     return 0;
